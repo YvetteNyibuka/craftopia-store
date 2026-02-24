@@ -1,210 +1,360 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import {
+    ChevronRight, Eye, Save, ImageIcon, GripVertical,
+    Settings, Plus, Trash2, Star, Bell, Instagram, BadgeCheck, ChevronDown,
+} from "lucide-react";
+import { FormField, FormSection, Toggle } from "@/components/ui/form-primitives";
+import { Textarea } from "@/components/ui/textarea";
 
-import { Eye, Save, Image as ImageIcon, Settings, GripVertical, ChevronRight, Plus } from "lucide-react";
+// ─── Types ──────────────────────────────────────────────────────────────────
+interface HeroBanner {
+    id: string;
+    heading: string;
+    subheading: string;
+    ctaLabel: string;
+    ctaLink: string;
+    visible: boolean;
+}
+
+interface FeaturedCollection {
+    id: string;
+    name: string;
+    productCount: number;
+    visible: boolean;
+}
+
+// ─── Sub-component: ToggleSwitch ─────────────────────────────────────────────
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={checked}
+            onClick={() => onChange(!checked)}
+            className={`w-11 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#5CE614] focus:ring-offset-2 ${checked ? "bg-[#5CE614]" : "bg-stone-200"}`}
+        >
+            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${checked ? "translate-x-6" : "translate-x-1"}`} />
+        </button>
+    );
+}
 
 export default function ContentManagerPage() {
+    // ── Hero banners ─────────────────────────────────────────────────────
+    const [banners, setBanners] = useState<HeroBanner[]>([
+        {
+            id: "b1",
+            heading: "Spring Renewal Collection",
+            subheading: "Fresh flowers, timeless arrangements.",
+            ctaLabel: "Shop Now",
+            ctaLink: "/collections/spring-24",
+            visible: true,
+        },
+    ]);
+
+    const updateBanner = (id: string, field: keyof HeroBanner, value: string | boolean) =>
+        setBanners((bs) => bs.map((b) => (b.id === id ? { ...b, [field]: value } : b)));
+
+    const addBanner = () =>
+        setBanners((bs) => [
+            ...bs,
+            { id: `b${Date.now()}`, heading: "", subheading: "", ctaLabel: "Shop Now", ctaLink: "", visible: true },
+        ]);
+
+    const removeBanner = (id: string) => setBanners((bs) => bs.filter((b) => b.id !== id));
+
+    // ── Featured collections ──────────────────────────────────────────────
+    const [featuredCols, setFeaturedCols] = useState<FeaturedCollection[]>([
+        { id: "c1", name: "Handcrafted Vases", productCount: 12, visible: true },
+        { id: "c2", name: "Summer Bouquets", productCount: 24, visible: true },
+        { id: "c3", name: "Minimalist Wall Art", productCount: 8, visible: false },
+    ]);
+
+    const toggleColVisibility = (id: string) =>
+        setFeaturedCols((cs) => cs.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c)));
+
+    const removeFeaturedCol = (id: string) =>
+        setFeaturedCols((cs) => cs.filter((c) => c.id !== id));
+
+    // ── Announcement bar ─────────────────────────────────────────────────
+    const [announcementEnabled, setAnnouncementEnabled] = useState(true);
+    const [announcementText, setAnnouncementText] = useState("🌸 Free shipping on orders over $60 — limited time only!");
+
+    // ── Section visibility ────────────────────────────────────────────────
+    const [sections, setSections] = useState({
+        heroEnabled: true,
+        featuredEnabled: true,
+        bestSellersEnabled: true,
+        reviewsEnabled: false,
+        newsletterEnabled: true,
+        instagramEnabled: true,
+        sustainabilityEnabled: true,
+    });
+
+    const toggleSection = (key: keyof typeof sections) =>
+        setSections((s) => ({ ...s, [key]: !s[key] }));
+
+    // ── Save ─────────────────────────────────────────────────────────────
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+
+    const handleSave = async () => {
+        setSaving(true);
+        // TODO: wire to API
+        await new Promise((r) => setTimeout(r, 900));
+        setSaving(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+    };
+
+    const inputCls = "flex h-11 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#5CE614] focus:border-[#5CE614]";
+
     return (
-        <main className="max-w-[900px]">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8">
+        <main className="max-w-[900px] space-y-6">
+
+            {/* ── Breadcrumb ─────────────────────────────────────────────── */}
+            <div className="flex items-center text-[11px] text-stone-500 font-medium">
+                <Link href="/admin" className="hover:text-[#111] transition-colors">Admin</Link>
+                <ChevronRight className="w-3 h-3 mx-1.5 text-stone-300" />
+                <span className="text-[#111] font-semibold">Homepage Manager</span>
+            </div>
+
+            {/* ── Header ─────────────────────────────────────────────────── */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <div className="flex items-center text-[11px] text-[#5CE614] font-bold tracking-widest uppercase mb-1">
-                        <Link href="/admin" className="hover:opacity-80 transition-opacity">Admin</Link>
-                        <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-stone-300" />
-                        <Link href="/admin/website" className="hover:opacity-80 transition-opacity">Website</Link>
-                        <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-stone-300" />
-                        <span className="text-[#111]">Homepage</span>
-                    </div>
-                    <h1 className="text-[32px] font-bold text-[#111] tracking-tight">Content Manager</h1>
+                    <h1 className="text-[30px] font-bold text-[#111] tracking-tight">Content Manager</h1>
+                    <p className="text-[14px] text-stone-500 mt-1">Edit your homepage layout, banners, and section visibility.</p>
                 </div>
-                <div className="flex items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 h-10 rounded-full bg-[#F4F5F6] text-[13px] font-bold text-[#111] hover:bg-stone-200 transition-colors">
+                <div className="flex items-center gap-3">
+                    <Link
+                        href="/"
+                        target="_blank"
+                        className="flex items-center gap-2 px-5 h-11 rounded-full border border-stone-200 text-[14px] font-semibold text-stone-600 hover:bg-stone-50 transition-colors bg-white shadow-sm"
+                    >
                         <Eye className="w-4 h-4" /> Preview
-                    </button>
-                    <button className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 h-10 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-[13px] shadow-sm transition-colors">
-                        <Save className="w-4 h-4" /> Save Changes
+                    </Link>
+                    <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-6 h-11 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-[14px] shadow-sm transition-colors disabled:opacity-60"
+                    >
+                        <Save className="w-4 h-4" />
+                        {saving ? "Saving…" : saved ? "✓ Saved!" : "Save Changes"}
                     </button>
                 </div>
             </div>
 
-            {/* Hero Banner Management */}
-            <section className="mb-10">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-[18px] font-bold text-[#111] flex items-center gap-2">
-                        <ImageIcon className="w-5 h-5 text-[#5CE614]" /> Hero Banner Management
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">Visible</span>
-                        <div className="w-10 h-5 bg-[#3B82F6] rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 flex items-center justify-center">
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            {/* ── Announcement Bar ────────────────────────────────────────── */}
+            <FormSection
+                title="Announcement Bar"
+                description="A slim bar shown at the very top of the storefront."
+            >
+                <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold text-[#111]">Enable Announcement Bar</span>
+                    <ToggleSwitch checked={announcementEnabled} onChange={setAnnouncementEnabled} />
+                </div>
+                {announcementEnabled && (
+                    <FormField label="Announcement Text" hint="Keep it short — ~80 characters works best.">
+                        <input
+                            id="announcement-text"
+                            type="text"
+                            value={announcementText}
+                            onChange={(e) => setAnnouncementText(e.target.value)}
+                            maxLength={120}
+                            className={inputCls}
+                        />
+                        <p className="text-[10px] text-stone-400 mt-1 text-right">{announcementText.length}/120</p>
+                        {announcementEnabled && announcementText && (
+                            <div className="mt-2 bg-[#111] text-white text-[12px] font-medium text-center px-4 py-2 rounded-lg">
+                                {announcementText}
+                            </div>
+                        )}
+                    </FormField>
+                )}
+            </FormSection>
+
+            {/* ── Hero Banners ─────────────────────────────────────────────── */}
+            <FormSection
+                title="Hero Banners"
+                description="Full-width slide(s) shown at the top of the homepage."
+            >
+                <div className="flex justify-between items-center">
+                    <span className="text-[11px] text-stone-400">
+                        {banners.length} banner{banners.length !== 1 ? "s" : ""} configured
+                    </span>
+                    <button
+                        type="button"
+                        onClick={addBanner}
+                        className="flex items-center gap-1.5 text-[12px] font-bold text-[#5CE614] hover:text-[#4BD600] transition-colors"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Add Banner
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {banners.map((banner, idx) => (
+                        <div key={banner.id} className="bg-stone-50 rounded-2xl border border-stone-100 p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-[13px] font-bold text-[#111] flex items-center gap-2">
+                                    <ImageIcon className="w-4 h-4 text-[#5CE614]" />
+                                    Banner {idx + 1}
+                                </h3>
+                                <div className="flex items-center gap-3">
+                                    <ToggleSwitch
+                                        checked={banner.visible}
+                                        onChange={(v) => updateBanner(banner.id, "visible", v)}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => removeBanner(banner.id)}
+                                        className="w-7 h-7 flex items-center justify-center rounded-lg text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Upload area */}
+                            <div className="h-28 border-2 border-dashed border-stone-200 rounded-xl flex items-center justify-center text-stone-400 hover:border-[#5CE614] hover:bg-[#F0FBE8]/30 transition-all cursor-pointer group">
+                                <div className="text-center">
+                                    <ImageIcon className="w-6 h-6 mx-auto mb-1 group-hover:text-[#5CE614] transition-colors" />
+                                    <p className="text-[11px] font-medium group-hover:text-[#5CE614] transition-colors">Upload banner image</p>
+                                    <p className="text-[10px] text-stone-300">Recommended 1920 × 600px</p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <FormField label="Heading">
+                                    <input
+                                        type="text"
+                                        value={banner.heading}
+                                        onChange={(e) => updateBanner(banner.id, "heading", e.target.value)}
+                                        placeholder="e.g. Spring Renewal Collection"
+                                        className={inputCls}
+                                    />
+                                </FormField>
+                                <FormField label="Subheading">
+                                    <input
+                                        type="text"
+                                        value={banner.subheading}
+                                        onChange={(e) => updateBanner(banner.id, "subheading", e.target.value)}
+                                        placeholder="A short tagline…"
+                                        className={inputCls}
+                                    />
+                                </FormField>
+                                <FormField label="CTA Button Label">
+                                    <input
+                                        type="text"
+                                        value={banner.ctaLabel}
+                                        onChange={(e) => updateBanner(banner.id, "ctaLabel", e.target.value)}
+                                        placeholder="Shop Now"
+                                        className={inputCls}
+                                    />
+                                </FormField>
+                                <FormField label="CTA Link">
+                                    <input
+                                        type="text"
+                                        value={banner.ctaLink}
+                                        onChange={(e) => updateBanner(banner.id, "ctaLink", e.target.value)}
+                                        placeholder="/collections/spring-24"
+                                        className={inputCls}
+                                    />
+                                </FormField>
                             </div>
                         </div>
-                    </div>
+                    ))}
                 </div>
+            </FormSection>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-white rounded-[20px] p-4 border border-stone-200 shadow-sm relative overflow-hidden group">
-                        <div className="absolute top-6 left-6 z-10">
-                            <span className="bg-[#5CE614] text-[#111] text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded">Active</span>
+            {/* ── Featured Collections ─────────────────────────────────────── */}
+            <FormSection
+                title="Featured Collections"
+                description="Choose which collections appear in the homepage grid. Drag to reorder."
+            >
+                <div className="space-y-3">
+                    {featuredCols.map((col) => (
+                        <div
+                            key={col.id}
+                            className={`flex items-center gap-4 bg-white rounded-[18px] p-4 border border-stone-200 shadow-sm transition-opacity ${col.visible ? "" : "opacity-50"}`}
+                        >
+                            <GripVertical className="w-5 h-5 text-stone-300 cursor-grab flex-shrink-0" />
+                            <div className="w-10 h-10 bg-stone-100 rounded-xl flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-bold text-[#111] truncate">{col.name}</p>
+                                <p className="text-[11px] text-stone-400">{col.productCount} products</p>
+                            </div>
+                            <ToggleSwitch checked={col.visible} onChange={() => toggleColVisibility(col.id)} />
+                            <button
+                                type="button"
+                                onClick={() => removeFeaturedCol(col.id)}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors flex-shrink-0"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                         </div>
-                        <div className="relative aspect-[2/1] bg-[#F2EDE7] rounded-[14px] mb-4 overflow-hidden border border-stone-100 flex items-center justify-end pr-8">
-                            <div className="absolute inset-0 bg-stone-200 mix-blend-multiply opacity-30"></div>
-                            {/* Mock banner graphic representation */}
-                            <div className="w-1/3 h-full bg-stone-300 rounded-l-full relative opacity-50 blur-sm"></div>
-                            <div className="absolute bottom-4 left-8 text-white z-20"></div>
-                        </div>
-                        <h3 className="text-[15px] font-bold text-[#111]">Spring Renewal Collection</h3>
-                        <p className="text-[13px] text-stone-500 mt-0.5">Link: /collections/spring-24</p>
-                    </div>
+                    ))}
 
-                    <div className="bg-[#F8F9FA] rounded-[20px] p-6 border-2 border-dashed border-stone-200 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-stone-50 hover:border-stone-300 transition-colors">
-                        <div className="w-12 h-12 bg-[#E9F4E5] rounded-full flex items-center justify-center text-[#5CE614] mb-4">
-                            <ImageIcon className="w-5 h-5" />
-                            <div className="absolute mt-5 ml-5 bg-white rounded-full"><Plus className="w-3 h-3 text-[#5CE614]" /></div>
-                        </div>
-                        <h3 className="text-[14px] font-bold text-[#111]">Add New Banner</h3>
-                        <p className="text-[12px] text-stone-500 mt-1">Recommended size: 1920 × 600px</p>
-                    </div>
+                    <button
+                        type="button"
+                        className="flex items-center gap-2 w-full h-11 rounded-[18px] border border-dashed border-stone-300 text-[13px] font-semibold text-stone-500 hover:text-stone-700 hover:border-stone-400 hover:bg-stone-50 transition-all justify-center"
+                    >
+                        <Plus className="w-4 h-4" /> Add Featured Collection
+                    </button>
                 </div>
-            </section>
+            </FormSection>
 
-            {/* Featured Collections */}
-            <section className="mb-10">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-[18px] font-bold text-[#111] flex items-center gap-2">
-                        <div className="flex flex-col gap-1 w-5">
-                            <div className="h-0.5 w-full bg-[#5CE614] rounded-full"></div>
-                            <div className="h-0.5 w-full bg-[#5CE614] rounded-full"></div>
-                            <div className="h-0.5 w-full bg-[#5CE614] rounded-full"></div>
-                        </div>
-                        Featured Collections
-                    </h2>
-                    <span className="text-[13px] text-stone-400">Drag to reorder sections on the homepage</span>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                    {/* Collection 1 */}
-                    <div className="bg-white rounded-[20px] p-4 border border-stone-200 shadow-sm flex items-center gap-4">
-                        <div className="text-stone-300 cursor-grab px-2">
-                            <GripVertical className="w-5 h-5" />
-                        </div>
-                        <div className="w-12 h-12 bg-[#F2EDE7] rounded-[10px] overflow-hidden flex-shrink-0 relative">
-                            <div className="absolute inset-0 bg-stone-900/10 mix-blend-multiply"></div>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-[14px] font-bold text-[#111]">Handcrafted Vases</h3>
-                            <p className="text-[12px] text-stone-500 mt-0.5">12 Products • Updated 2 days ago</p>
-                        </div>
-                        <div className="flex items-center gap-5 px-2">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">Visible</span>
-                                <div className="w-10 h-5 bg-[#3B82F6] rounded-full relative cursor-pointer">
-                                    <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 flex items-center justify-center">
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            {/* ── Section Visibility ────────────────────────────────────────── */}
+            <FormSection
+                title="Section Visibility"
+                description="Toggle which sections appear on the homepage."
+            >
+                <div className="space-y-1">
+                    {[
+                        { key: "heroEnabled", icon: ImageIcon, label: "Hero Banner", desc: "Full-width top banner" },
+                        { key: "featuredEnabled", icon: Star, label: "Featured Collections", desc: "Collection grid tiles" },
+                        { key: "bestSellersEnabled", icon: BadgeCheck, label: "Best Sellers Strip", desc: "Most-purchased products" },
+                        { key: "reviewsEnabled", icon: Star, label: "Customer Reviews", desc: "Star ratings & testimonials" },
+                        { key: "newsletterEnabled", icon: Bell, label: "Newsletter Popup", desc: "Email capture modal" },
+                        { key: "instagramEnabled", icon: Instagram, label: "Instagram Feed", desc: "Social media grid" },
+                        { key: "sustainabilityEnabled", icon: ChevronDown, label: "Sustainability Banner", desc: "Eco-credentials section" },
+                    ].map(({ key, icon: Icon, label, desc }) => {
+                        const isOn = sections[key as keyof typeof sections];
+                        return (
+                            <div key={key} className="flex items-center justify-between py-3 border-b border-stone-50 last:border-0">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isOn ? "bg-[#E9F4E5]" : "bg-stone-100"} transition-colors`}>
+                                        <Icon className={`w-4 h-4 ${isOn ? "text-[#5CE614]" : "text-stone-400"} transition-colors`} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[13px] font-bold text-[#111]">{label}</p>
+                                        <p className="text-[11px] text-stone-400">{desc}</p>
                                     </div>
                                 </div>
+                                <ToggleSwitch checked={isOn} onChange={() => toggleSection(key as keyof typeof sections)} />
                             </div>
-                            <button className="text-stone-400 hover:text-stone-600 transition-colors">
-                                <Settings className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Collection 2 */}
-                    <div className="bg-white rounded-[20px] p-4 border border-stone-200 shadow-sm flex items-center gap-4">
-                        <div className="text-stone-300 cursor-grab px-2">
-                            <GripVertical className="w-5 h-5" />
-                        </div>
-                        <div className="w-12 h-12 bg-[#F9EAEA] rounded-[10px] overflow-hidden flex-shrink-0 relative">
-                            <div className="absolute inset-0 bg-red-900/5 mix-blend-multiply"></div>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-[14px] font-bold text-[#111]">Summer Bouquets</h3>
-                            <p className="text-[12px] text-stone-500 mt-0.5">24 Products • Updated 1 week ago</p>
-                        </div>
-                        <div className="flex items-center gap-5 px-2">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">Visible</span>
-                                <div className="w-10 h-5 bg-[#3B82F6] rounded-full relative cursor-pointer">
-                                    <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 flex items-center justify-center">
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                    </div>
-                                </div>
-                            </div>
-                            <button className="text-stone-400 hover:text-stone-600 transition-colors">
-                                <Settings className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Collection 3 */}
-                    <div className="bg-white rounded-[20px] p-4 border border-stone-200 shadow-sm flex items-center gap-4 opacity-75">
-                        <div className="text-stone-300 cursor-grab px-2">
-                            <GripVertical className="w-5 h-5" />
-                        </div>
-                        <div className="w-12 h-12 bg-[#EADCC3] rounded-[10px] overflow-hidden flex-shrink-0 relative">
-                            <div className="absolute inset-x-3 bottom-0 top-3 rounded-t-[20px] bg-[#C1A881]"></div>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-[14px] font-bold text-[#111]">Minimalist Wall Art</h3>
-                            <p className="text-[12px] text-stone-500 mt-0.5">8 Products • Updated 5 days ago</p>
-                        </div>
-                        <div className="flex items-center gap-5 px-2">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold tracking-widest text-stone-400 uppercase">Visible</span>
-                                <div className="w-10 h-5 bg-stone-200 rounded-full relative cursor-pointer">
-                                    <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 left-0.5 shadow-sm"></div>
-                                </div>
-                            </div>
-                            <button className="text-stone-400 hover:text-stone-600 transition-colors">
-                                <Settings className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
+                        );
+                    })}
                 </div>
+            </FormSection>
 
-                <button className="w-full h-[52px] rounded-[14px] border border-dashed border-stone-300 text-[13px] font-bold text-stone-500 hover:text-stone-700 hover:bg-stone-50 hover:border-stone-400 transition-all">
-                    + Add Featured Collection Slot
+            {/* ── Bottom save ──────────────────────────────────────────────── */}
+            <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm border-t border-stone-100 -mx-8 px-8 py-4 flex justify-between items-center">
+                <p className="text-[12px] text-stone-400">Changes are saved to a draft until you publish.</p>
+                <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-8 h-11 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-[14px] shadow-sm transition-colors disabled:opacity-60"
+                >
+                    <Save className="w-4 h-4" />
+                    {saving ? "Saving…" : saved ? "✓ Saved!" : "Save Changes"}
                 </button>
-            </section>
+            </div>
 
-            {/* Section Visibility Summary */}
-            <section>
-                <h2 className="text-[18px] font-bold text-[#111] mb-4">Section Visibility Summary</h2>
-                <div className="bg-[#FAF9F6] rounded-[20px] p-6 border border-stone-100 shadow-sm flex flex-wrap gap-4 md:gap-8 justify-between">
-
-                    <div className="flex items-center justify-between flex-1 min-w-[200px] bg-white rounded-xl p-4 border border-stone-100">
-                        <span className="text-[13px] font-bold text-[#111]">Newsletter Popup</span>
-                        <div className="w-10 h-5 bg-[#3B82F6] rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 flex items-center justify-center">
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-between flex-1 min-w-[200px] bg-white rounded-xl p-4 border border-stone-100">
-                        <span className="text-[13px] font-bold text-[#111]">Instagram Feed</span>
-                        <div className="w-10 h-5 bg-[#3B82F6] rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5 flex items-center justify-center">
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-between flex-1 min-w-[200px] bg-white rounded-xl p-4 border border-stone-100 opacity-75">
-                        <span className="text-[13px] font-bold text-[#111]">Customer Reviews</span>
-                        <div className="w-10 h-5 bg-stone-200 rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute top-0.5 left-0.5 shadow-sm"></div>
-                        </div>
-                    </div>
-
-                </div>
-            </section>
-
-            <div className="h-16"></div>
+            <div className="h-8" />
         </main>
     );
 }
