@@ -23,7 +23,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     return (
         <div className="bg-[#FAFAFA] min-h-screen">
 
-            {/* ─── DESKTOP layout: sidebar + content ─── */}
             <div className="hidden md:flex max-w-[1200px] mx-auto px-6 py-12 gap-10 items-start">
 
                 {/* Desktop sidebar */}
