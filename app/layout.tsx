@@ -15,7 +15,13 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "Craftopia — Crafted Beauty for Every Space.",
   description: "Discover hand-picked botanical arrangements, dried florals, artisanal ceramics and home décor at Craftopia.",
-  icons: { icon: "/CraftopiaLogo/IconLogo.png" },
+  icons: {
+    icon: [
+      { url: "/CraftopiaLogo/IconLogo.png", type: "image/png" },
+    ],
+    shortcut: "/CraftopiaLogo/IconLogo.png",
+    apple: "/CraftopiaLogo/IconLogo.png",
+  },
 };
 
 export default function RootLayout({
