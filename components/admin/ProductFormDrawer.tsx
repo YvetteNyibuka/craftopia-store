@@ -139,17 +139,44 @@ export function ProductFormDrawer({ open, onClose, initial, onSave }: ProductFor
         const errs = validate();
         if (Object.keys(errs).length) {
             setErrors(errs);
-            // Jump to the tab that has the first error
             if (errs.title || errs.category) setActiveTab("details");
             else if (errs.price) setActiveTab("pricing");
             return;
         }
         setSaving(true);
-        await new Promise((r) => setTimeout(r, 700)); // TODO: replace with API call
-        setSaving(false);
-        onSave?.(form);
-        onClose();
+        try {
+            const { productsApi } = await import("@/lib/api/products");
+            const payload = {
+                title: form.title,
+                slug: form.slug,
+                description: form.description,
+                category: form.category,
+                price: parseFloat(form.price) || 0,
+                comparePrice: form.comparePrice ? parseFloat(form.comparePrice) : undefined,
+                sku: form.sku || undefined,
+                stockCount: parseInt(form.stockCount) || 0,
+                isActive: form.isActive,
+                isNewProduct: form.isNew,
+                isBestSeller: form.isBestSeller,
+                tags: form.tags,
+            };
+
+            if (form.id) {
+                const res = await productsApi.update(String(form.id), payload);
+                onSave?.({ ...form, id: res.data._id });
+            } else {
+                const res = await productsApi.create(payload);
+                onSave?.({ ...form, id: res.data._id });
+            }
+            onClose();
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Save failed.";
+            setErrors({ title: msg });
+        } finally {
+            setSaving(false);
+        }
     };
+
 
     const inp = "flex h-11 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-[#5CE614] focus:border-[#5CE614]";
 
@@ -196,8 +223,8 @@ export function ProductFormDrawer({ open, onClose, initial, onSave }: ProductFor
                         type="button"
                         onClick={() => setActiveTab(key)}
                         className={`flex-1 h-8 rounded-lg text-[13px] font-semibold transition-colors ${activeTab === key
-                                ? "bg-white text-[#111] shadow-sm"
-                                : "text-stone-500 hover:text-[#111]"
+                            ? "bg-white text-[#111] shadow-sm"
+                            : "text-stone-500 hover:text-[#111]"
                             }`}
                     >
                         {label}

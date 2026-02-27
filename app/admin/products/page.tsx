@@ -1,349 +1,282 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { Download, Plus, Filter, LayoutGrid, List, ChevronRight, ChevronLeft, MoreHorizontal, AlertTriangle, AlertCircle, Pencil, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, Plus, LayoutGrid, List, ChevronRight, Pencil, Trash2, Loader2, Search, RefreshCw, AlertTriangle } from "lucide-react";
 import { ProductFormDrawer, type ProductFormData } from "@/components/admin/ProductFormDrawer";
+import { productsApi, ApiProduct } from "@/lib/api/products";
+import { formatCurrency } from "@/lib/utils/format";
+import { ApiError } from "@/lib/api/client";
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-const INITIAL_PRODUCTS = [
-    {
-        id: 1,
-        name: "Ethereal White Roses",
-        updatedAt: "Last updated 2h ago",
-        sku: "FLR-2024-001",
-        category: "Floral Arrangements",
-        categoryClass: "bg-blue-50 text-blue-600",
-        price: "$85.00",
-        priceNum: 85,
-        stockLevel: "In Stock",
-        units: 42,
-        stockClass: "text-[#5CE614]",
-        barWidth: "60%",
-        barColor: "bg-[#5CE614]",
-        image: "/images/decors/Image1.jpeg",
-    },
-    {
-        id: 2,
-        name: "Rustic Lavender Bundle",
-        updatedAt: "Last updated 5h ago",
-        sku: "DRY-2024-012",
-        category: "Dried Flowers",
-        categoryClass: "bg-purple-50 text-purple-600",
-        price: "$32.00",
-        priceNum: 32,
-        stockLevel: "Low Stock",
-        units: 8,
-        stockClass: "text-[#F5A623]",
-        barWidth: "15%",
-        barColor: "bg-[#F5A623]",
-        image: "/images/decors/image2.jpeg",
-    },
-    {
-        id: 3,
-        name: "Minimalist Ceramic Vase",
-        updatedAt: "Last updated 1d ago",
-        sku: "DCR-2024-055",
-        category: "Home Décor",
-        categoryClass: "bg-orange-50 text-orange-600",
-        price: "$45.00",
-        priceNum: 45,
-        stockLevel: "In Stock",
-        units: 120,
-        stockClass: "text-[#5CE614]",
-        barWidth: "100%",
-        barColor: "bg-[#5CE614]",
-        image: "/images/decors/Image3.jpeg",
-    },
-    {
-        id: 4,
-        name: "Golden Pampas Grass",
-        updatedAt: "Last updated 12h ago",
-        sku: "DRY-2024-098",
-        category: "Dried Flowers",
-        categoryClass: "bg-purple-50 text-purple-600",
-        price: "$28.00",
-        priceNum: 28,
-        stockLevel: "Out of Stock",
-        units: 0,
-        stockClass: "text-[#D0021B]",
-        barWidth: "0%",
-        barColor: "bg-transparent",
-        image: "/images/decors/Image4.jpeg",
-    },
-];
+type ViewMode = "grid" | "list";
 
-export default function AdminInventoryPage() {
-    const [products, setProducts] = useState(INITIAL_PRODUCTS);
+const stockStyle = (count: number) => {
+    if (count === 0) return { label: "Out of Stock", bar: "bg-red-400", barW: "5%", text: "text-red-500" };
+    if (count <= 10) return { label: "Low Stock", bar: "bg-amber-400", barW: "20%", text: "text-amber-500" };
+    if (count <= 30) return { label: "Limited", bar: "bg-blue-400", barW: "50%", text: "text-blue-500" };
+    return { label: "In Stock", bar: "bg-[#5CE614]", barW: "85%", text: "text-[#5CE614]" };
+};
 
-    // ── Drawer state ─────────────────────────────────────────────────────
+export default function AdminProductsPage() {
+    const [products, setProducts] = useState<ApiProduct[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [view, setView] = useState<ViewMode>("list");
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
+
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const [editTarget, setEditTarget] = useState<Partial<ProductFormData> | null>(null);
+    const [editInitial, setEditInitial] = useState<Partial<ProductFormData> | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    const openCreate = () => {
-        setEditTarget(null);
+    const load = async () => {
+        setIsLoading(true);
+        try {
+            const res = await productsApi.list({
+                page,
+                limit: 12,
+                ...(search ? { search } : {}),
+                ...(statusFilter ? { status: statusFilter } : {}),
+            });
+            setProducts(res.data);
+            setTotal(res.total);
+            setTotalPages(res.pages);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => { load(); }, [page, statusFilter]); // eslint-disable-line
+
+    const openNew = () => {
+        setEditInitial(null);
         setDrawerOpen(true);
     };
 
-    const openEdit = (p: typeof INITIAL_PRODUCTS[number]) => {
-        setEditTarget({
-            id: p.id,
-            title: p.name,
-            slug: p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    const openEdit = (p: ApiProduct) => {
+        setEditInitial({
+            id: p._id,
+            title: p.title,
+            slug: p.slug,
+            description: p.description,
             category: p.category,
-            sku: p.sku,
-            price: p.priceNum.toString(),
-            stockCount: p.units.toString(),
-            isActive: true,
-            trackInventory: true,
+            price: String(p.price),
+            comparePrice: p.comparePrice ? String(p.comparePrice) : "",
+            sku: p.sku ?? "",
+            stockCount: String(p.stockCount),
+            isActive: p.isActive,
+            isNew: !!p.isNewProduct,
+            isBestSeller: !!p.isBestSeller,
+            tags: p.tags ?? [],
         });
         setDrawerOpen(true);
     };
 
-    const handleSave = (data: ProductFormData) => {
-        if (data.id) {
-            setProducts((ps) =>
-                ps.map((p) =>
-                    p.id === data.id
-                        ? {
-                            ...p,
-                            name: data.title,
-                            sku: data.sku || p.sku,
-                            price: `$${parseFloat(data.price || "0").toFixed(2)}`,
-                            priceNum: parseFloat(data.price || "0"),
-                            updatedAt: "Just now",
-                        }
-                        : p
-                )
-            );
-        } else {
-            setProducts((ps) => [
-                ...ps,
-                {
-                    id: Date.now(),
-                    name: data.title,
-                    updatedAt: "Just now",
-                    sku: data.sku || "N/A",
-                    category: data.category,
-                    categoryClass: "bg-stone-100 text-stone-600",
-                    price: `$${parseFloat(data.price || "0").toFixed(2)}`,
-                    priceNum: parseFloat(data.price || "0"),
-                    stockLevel: parseInt(data.stockCount || "0") > 0 ? "In Stock" : "Out of Stock",
-                    units: parseInt(data.stockCount || "0"),
-                    stockClass: parseInt(data.stockCount || "0") > 0 ? "text-[#5CE614]" : "text-[#D0021B]",
-                    barWidth: `${Math.min(100, parseInt(data.stockCount || "0"))}%`,
-                    barColor: parseInt(data.stockCount || "0") > 0 ? "bg-[#5CE614]" : "bg-transparent",
-                    image: "/images/decors/Image1.jpeg",
-                },
-            ]);
-        }
+    const handleSave = async () => {
+        setDrawerOpen(false);
+        await load();
     };
 
-    const handleDelete = (id: number) => {
-        if (confirm("Delete this product?")) {
-            setProducts((ps) => ps.filter((p) => p.id !== id));
+    const handleDelete = async (id: string) => {
+        if (!confirm("Delete this product? This cannot be undone.")) return;
+        setDeletingId(id);
+        try {
+            await productsApi.delete(id);
+            setProducts((prev) => prev.filter((p) => p._id !== id));
+            setTotal((t) => t - 1);
+        } catch (err) {
+            alert(err instanceof ApiError ? err.message : "Delete failed.");
+        } finally {
+            setDeletingId(null);
         }
     };
 
     return (
-        <>
-            {/* ── Product Form Drawer ────────────────────────────────── */}
-            <ProductFormDrawer
-                open={drawerOpen}
-                onClose={() => setDrawerOpen(false)}
-                initial={editTarget}
-                onSave={handleSave}
-            />
-
-            <div className="space-y-6">
-                {/* Breadcrumb */}
-                <div className="flex items-center text-[13px] text-stone-500 font-medium">
-                    <Link href="/admin" className="hover:text-[#111] transition-colors">Admin</Link>
-                    <ChevronRight className="w-3.5 h-3.5 mx-2 text-stone-300" />
-                    <span className="text-[#111] font-semibold">Product Inventory</span>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-[32px] font-bold text-[#111] tracking-tight mb-1">Products</h1>
+                    <p className="text-[15px] text-stone-500">{total} products in your catalogue</p>
                 </div>
+                <div className="flex items-center gap-3">
+                    <button onClick={load} className="flex items-center gap-2 px-4 h-10 rounded-full border border-stone-200 text-sm font-semibold text-[#111] hover:bg-stone-50 transition-colors bg-white shadow-sm">
+                        <RefreshCw className="w-4 h-4" /> Refresh
+                    </button>
+                    <button className="flex items-center gap-2 px-5 h-11 rounded-full border border-stone-200 text-sm font-semibold text-[#111] hover:bg-stone-50 transition-colors bg-white shadow-sm">
+                        <Download className="w-4 h-4" /> Export
+                    </button>
+                    <button
+                        onClick={openNew}
+                        className="flex items-center gap-2 px-6 h-11 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-sm shadow-sm transition-colors"
+                    >
+                        <Plus className="w-4 h-4" /> Add Product
+                    </button>
+                </div>
+            </div>
 
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-[32px] font-bold text-[#111] tracking-tight mb-2">Product Inventory</h1>
-                        <p className="text-[15px] text-stone-500">Manage your floral arrangements, dried flowers, and home décor catalog.</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button className="flex items-center gap-2 px-5 h-11 rounded-full border border-stone-200 text-[14px] font-semibold text-[#111] hover:bg-stone-50 transition-colors bg-white shadow-sm">
-                            <Download className="w-4 h-4" /> Export CSV
-                        </button>
+            {/* Filters */}
+            <div className="bg-white rounded-[20px] p-3 border border-stone-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2">
+                    {(["", "active", "inactive"] as const).map((f) => (
                         <button
-                            id="btn-new-product"
-                            onClick={openCreate}
-                            className="flex items-center gap-2 px-6 h-11 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-[14px] shadow-sm transition-colors"
+                            key={f || "all"}
+                            onClick={() => { setStatusFilter(f); setPage(1); }}
+                            className={`px-4 h-9 rounded-xl text-[13px] font-bold transition-colors ${statusFilter === f ? "bg-[#5CE614] text-black" : "border border-stone-200 text-stone-600 hover:bg-stone-50"}`}
                         >
-                            <Plus className="w-4 h-4" /> Add New Product
+                            {f ? (f === "active" ? "Active" : "Inactive") : "All"}
                         </button>
+                    ))}
+                </div>
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-none">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                        <input
+                            type="text"
+                            placeholder="Search products…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") { setPage(1); load(); } }}
+                            className="w-full md:w-[240px] h-10 pl-9 pr-4 rounded-xl border border-stone-200 text-[13px] focus:outline-none focus:border-[#5CE614]"
+                        />
+                    </div>
+                    <div className="flex border border-stone-200 rounded-xl overflow-hidden">
+                        <button onClick={() => setView("list")} className={`w-9 h-9 flex items-center justify-center transition-colors ${view === "list" ? "bg-[#5CE614] text-black" : "hover:bg-stone-50 text-stone-400"}`}><List className="w-4 h-4" /></button>
+                        <button onClick={() => setView("grid")} className={`w-9 h-9 flex items-center justify-center transition-colors ${view === "grid" ? "bg-[#5CE614] text-black" : "hover:bg-stone-50 text-stone-400"}`}><LayoutGrid className="w-4 h-4" /></button>
                     </div>
                 </div>
+            </div>
 
-                {/* Filters Row */}
-                <div className="bg-white rounded-[20px] p-3 border border-stone-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
-                        <button className="flex items-center justify-between min-w-[130px] px-4 h-10 rounded-xl border border-stone-200 bg-white text-[13px] font-medium text-stone-600 hover:border-stone-300 transition-colors">
-                            <span className="flex items-center gap-2"><Filter className="w-3.5 h-3.5" /> Status: All</span>
-                            <ChevronRight className="w-3.5 h-3.5 rotate-90" />
-                        </button>
-                        <button className="flex items-center justify-between min-w-[120px] px-4 h-10 rounded-xl border border-stone-200 bg-white text-[13px] font-medium text-stone-600 hover:border-stone-300 transition-colors">
-                            <span>Category</span>
-                            <ChevronRight className="w-3.5 h-3.5 rotate-90" />
-                        </button>
-                        <button className="flex items-center justify-between min-w-[140px] px-4 h-10 rounded-xl border border-stone-200 bg-white text-[13px] font-medium text-stone-600 hover:border-stone-300 transition-colors">
-                            <span>Price Range</span>
-                            <ChevronRight className="w-3.5 h-3.5 rotate-90" />
-                        </button>
-                        <button className="text-[13px] font-bold text-[#5CE614] hover:text-[#4BD600] px-2 whitespace-nowrap transition-colors">
-                            Clear Filters
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-5 w-full md:w-auto justify-between md:justify-end px-2">
-                        <span className="text-[13px] text-stone-500 font-medium whitespace-nowrap">
-                            Showing 1–{products.length} of {products.length} products
-                        </span>
-                        <div className="flex items-center bg-stone-100 p-0.5 rounded-xl">
-                            <button className="w-9 h-9 rounded-lg bg-white shadow-sm flex items-center justify-center text-stone-700">
-                                <LayoutGrid className="w-4 h-4" />
-                            </button>
-                            <button className="w-9 h-9 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 transition-colors">
-                                <List className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
+            {/* Products */}
+            {isLoading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#5CE614]" />
                 </div>
-
-                {/* Table */}
-                <div className="bg-white rounded-[24px] border border-stone-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[900px]">
-                            <thead>
-                                <tr className="border-b border-stone-100 bg-white">
-                                    <th className="py-5 px-6 opacity-0 w-[60px]"><input type="checkbox" /></th>
-                                    <th className="py-5 px-4 text-[13px] font-bold text-stone-600 w-[30%]">Product Name</th>
-                                    <th className="py-5 px-4 text-[13px] font-bold text-stone-600">SKU</th>
-                                    <th className="py-5 px-4 text-[13px] font-bold text-stone-600">Category</th>
-                                    <th className="py-5 px-4 text-[13px] font-bold text-stone-600 w-[120px]">Price</th>
-                                    <th className="py-5 px-4 text-[13px] font-bold text-stone-600 w-[200px]">Stock Level</th>
-                                    <th className="py-5 px-6 text-[13px] font-bold text-stone-600 text-right w-[120px]">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-stone-100">
-                                {products.map((product) => (
-                                    <tr key={product.id} className="hover:bg-stone-50/50 transition-colors bg-white group">
-                                        <td className="py-4 px-6 relative">
-                                            <div className="absolute inset-y-0 left-6 flex items-center">
-                                                <div className="w-[18px] h-[18px] rounded-md border-2 border-stone-200 hover:border-[#5CE614] bg-white cursor-pointer transition-colors" />
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-2xl border border-stone-100 overflow-hidden flex-shrink-0 relative">
-                                                    <Image src={product.image} alt={product.name} fill className="object-cover object-center" />
+            ) : products.length === 0 ? (
+                <div className="text-center py-20 bg-white rounded-[24px] border border-stone-100">
+                    <p className="text-stone-400 text-sm">No products found. <button onClick={openNew} className="text-[#5CE614] font-bold">Add your first product</button></p>
+                </div>
+            ) : view === "list" ? (
+                <div className="bg-white rounded-[24px] shadow-sm border border-stone-100 overflow-hidden">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="border-b border-stone-100 text-[11px] font-bold uppercase tracking-widest text-stone-400 bg-stone-50 text-left">
+                                <th className="px-6 py-4">Product</th>
+                                <th className="px-6 py-4">SKU</th>
+                                <th className="px-6 py-4">Category</th>
+                                <th className="px-6 py-4">Price</th>
+                                <th className="px-6 py-4">Stock</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                            {products.map((p) => {
+                                const stock = stockStyle(p.stockCount);
+                                return (
+                                    <tr key={p._id} className="hover:bg-stone-50/50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-xl bg-stone-100 overflow-hidden flex-shrink-0">
+                                                    {p.images?.[0] && <img src={p.images[0]} alt={p.title} className="w-full h-full object-cover" />}
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-[14px] font-bold text-[#111]">{product.name}</h3>
-                                                    <p className="text-[11px] text-stone-400 mt-0.5">{product.updatedAt}</p>
+                                                    <p className="text-[13px] font-bold text-[#111] line-clamp-1">{p.title}</p>
+                                                    <p className="text-[11px] text-stone-400 mt-0.5">Updated {new Date(p.createdAt).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="py-4 px-4">
-                                            <span className="text-[13px] font-medium text-stone-500 tracking-wide font-mono">{product.sku}</span>
+                                        <td className="px-6 py-4 text-[12px] font-mono text-stone-400">{p.sku ?? "—"}</td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">{p.category}</span>
                                         </td>
-                                        <td className="py-4 px-4">
-                                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${product.categoryClass}`}>
-                                                {product.category}
+                                        <td className="px-6 py-4 text-[14px] font-bold text-[#111]">{formatCurrency(p.price)}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {p.stockCount <= 10 && <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+                                                <span className={`text-[12px] font-bold ${stock.text}`}>{p.stockCount} units</span>
+                                                <div className="w-14 h-1.5 rounded-full bg-stone-100 overflow-hidden">
+                                                    <div className={`h-full rounded-full ${stock.bar}`} style={{ width: stock.barW }} />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${p.isActive ? "bg-[#E9F8E5] text-[#3F6136]" : "bg-stone-100 text-stone-500"}`}>
+                                                {p.isActive ? "Active" : "Inactive"}
                                             </span>
                                         </td>
-                                        <td className="py-4 px-4">
-                                            <span className="text-[15px] font-bold text-[#111]">{product.price}</span>
-                                        </td>
-                                        <td className="py-4 px-4 pr-10">
-                                            <div className="flex justify-between items-center text-[11px] font-bold mb-1.5">
-                                                <span className={product.stockClass}>{product.stockLevel}</span>
-                                                <span className="text-[#111]">{product.units} units</span>
-                                            </div>
-                                            <div className="w-full h-[5px] bg-stone-100 rounded-full relative overflow-hidden">
-                                                {product.units > 0 && (
-                                                    <div className={`absolute top-0 left-0 h-full rounded-full ${product.barColor}`} style={{ width: product.barWidth }} />
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6">
-                                            <div className="flex justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => openEdit(product)}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
-                                                >
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => openEdit(p)} className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-stone-200 transition-colors">
                                                     <Pencil className="w-3.5 h-3.5" />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete(product.id)}
-                                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                    onClick={() => handleDelete(p._id)}
+                                                    disabled={deletingId === p._id}
+                                                    className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-60"
                                                 >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button className="w-8 h-8 flex items-center justify-center rounded-lg text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors">
-                                                    <MoreHorizontal className="w-4 h-4" />
+                                                    {deletingId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                );
+                            })}
+                        </tbody>
+                    </table>
 
-                    {/* Pagination */}
-                    <div className="border-t border-stone-100 px-6 py-5 flex items-center justify-between bg-white">
-                        <span className="text-[14px] font-medium text-stone-500">Page 1 of 1</span>
-                        <div className="flex items-center gap-2">
-                            <button className="w-9 h-9 rounded-full border border-stone-200 flex items-center justify-center text-stone-400 hover:bg-stone-50 disabled:opacity-50">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <button className="w-9 h-9 rounded-full bg-[#5CE614] text-[#111] font-bold text-[13px] flex items-center justify-center">1</button>
-                            <button className="w-9 h-9 rounded-full border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+                    {totalPages > 1 && (
+                        <div className="px-6 py-4 border-t border-stone-100 flex items-center justify-between">
+                            <p className="text-[13px] text-stone-500">Page {page} of {totalPages} · {total} products</p>
+                            <div className="flex gap-2">
+                                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-4 h-9 rounded-xl border border-stone-200 text-[13px] font-bold text-stone-600 disabled:opacity-40 hover:bg-stone-50">Previous</button>
+                                <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="px-4 h-9 rounded-xl border border-stone-200 text-[13px] font-bold text-stone-600 disabled:opacity-40 hover:bg-stone-50">
+                                    Next <ChevronRight className="inline w-3.5 h-3.5 ml-1" />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
+            ) : (
+                /* Grid view */
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    {products.map((p) => {
+                        const stock = stockStyle(p.stockCount);
+                        return (
+                            <div key={p._id} className="bg-white rounded-[20px] border border-stone-100 shadow-sm overflow-hidden group hover:shadow-md transition-all">
+                                <div className="relative h-44 bg-stone-100">
+                                    {p.images?.[0] && <img src={p.images[0]} alt={p.title} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />}
+                                    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => openEdit(p)} className="w-8 h-8 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-stone-600 hover:bg-white shadow-sm"><Pencil className="w-3.5 h-3.5" /></button>
+                                        <button onClick={() => handleDelete(p._id)} disabled={deletingId === p._id} className="w-8 h-8 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-stone-600 hover:text-red-500 hover:bg-white shadow-sm disabled:opacity-60">
+                                            {deletingId === p._id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                        </button>
+                                    </div>
+                                    {!p.isActive && <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px]" />}
+                                </div>
+                                <div className="p-4">
+                                    <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-1">{p.category}</p>
+                                    <p className="font-bold text-[14px] text-[#111] line-clamp-1 mb-2">{p.title}</p>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-[16px] text-[#111]">{formatCurrency(p.price)}</span>
+                                        <span className={`text-[11px] font-bold ${stock.text}`}>{stock.label}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2 pb-16">
-                    <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-2">
-                            <h3 className="text-[13px] font-bold text-stone-500">Total Products</h3>
-                            <span className="text-[11px] font-bold text-[#3F6136] bg-[#E9F4E5] px-2 py-0.5 rounded-full">+{products.length} new</span>
-                        </div>
-                        <div className="text-[32px] font-bold text-[#111]">{products.length}</div>
-                    </div>
-                    <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm hover:shadow-md transition-shadow">
-                        <h3 className="text-[13px] font-bold text-stone-500 mb-2">Total Stock Value</h3>
-                        <div className="text-[32px] font-bold text-[#111]">${products.reduce((a, p) => a + p.priceNum * p.units, 0).toLocaleString()}</div>
-                    </div>
-                    <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm border-l-4 border-l-[#F5A623] hover:shadow-md transition-shadow">
-                        <h3 className="text-[13px] font-bold text-stone-500 mb-2">Low Stock Alerts</h3>
-                        <div className="text-[32px] font-bold text-[#111] flex items-center gap-3">
-                            {products.filter(p => p.units > 0 && p.units < 10).length}
-                            <AlertTriangle className="w-6 h-6 text-[#F5A623] fill-[#FDF3E3]" />
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm border-l-4 border-l-[#D0021B] hover:shadow-md transition-shadow">
-                        <h3 className="text-[13px] font-bold text-stone-500 mb-2">Out of Stock</h3>
-                        <div className="text-[32px] font-bold text-[#111] flex items-center gap-3">
-                            {products.filter(p => p.units === 0).length}
-                            <AlertCircle className="w-6 h-6 text-[#D0021B] fill-[#FDE8E9]" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </>
+            <ProductFormDrawer
+                open={drawerOpen}
+                onClose={() => setDrawerOpen(false)}
+                initial={editInitial}
+                onSave={handleSave}
+            />
+        </div>
     );
 }
