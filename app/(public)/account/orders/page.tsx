@@ -1,189 +1,124 @@
 "use client";
 
-import { Filter, Download, CheckCircle2, Truck, XCircle, ChevronRight, ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Package, Loader2, ChevronRight } from "lucide-react";
+import { ordersApi, ApiOrder } from "@/lib/api/orders";
+import { formatCurrency } from "@/lib/utils/format";
+import { useAuth } from "@/contexts/AuthContext";
 
-export default function OrderHistoryPage() {
-    type OrderItem = {
-        id: number;
-        imageClass?: string;
-        hasFlowers?: boolean;
-        hasVase?: boolean;
-        isCount?: boolean;
-        count?: string;
-    };
+const STATUS_STYLES: Record<string, string> = {
+    Pending: "bg-amber-50 text-amber-600 border-amber-200",
+    Processing: "bg-blue-50 text-blue-600 border-blue-200",
+    Shipped: "bg-purple-50 text-purple-600 border-purple-200",
+    Delivered: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Cancelled: "bg-red-50 text-red-600 border-red-200",
+};
 
-    type Order = {
-        id: string;
-        status: string;
-        date: string;
-        total: number;
-        isRefunded?: boolean;
-        items: OrderItem[];
-    };
+export default function OrdersPage() {
+    const { isAuthenticated, isLoading: authLoading } = useAuth();
+    const [orders, setOrders] = useState<ApiOrder[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
 
-    const orders: Order[] = [
-        {
-            id: "#FH-20942",
-            status: "DELIVERED",
-            date: "October 24, 2023",
-            total: 142.00,
-            items: [
-                { id: 1, imageClass: "bg-[#E1D4C6]", hasFlowers: true },
-                { id: 2, imageClass: "bg-[#2A4720]", hasFlowers: true },
-                { id: 3, isCount: true, count: "+1" }
-            ]
-        },
-        {
-            id: "#FH-20958",
-            status: "IN TRANSIT",
-            date: "November 02, 2023",
-            total: 89.50,
-            items: [
-                { id: 1, imageClass: "bg-[#EBEBEB]", hasVase: true }
-            ]
-        },
-        {
-            id: "#FH-20711",
-            status: "CANCELLED",
-            date: "September 15, 2023",
-            total: 0.00,
-            isRefunded: true,
-            items: []
-        }
-    ];
+    useEffect(() => {
+        if (!isAuthenticated) { setIsLoading(false); return; }
+        setIsLoading(true);
+        ordersApi.list({ page, limit: 10 })
+            .then((r) => { setOrders(r.data); setTotalPages(r.pages); setTotal(r.total); })
+            .catch(() => { })
+            .finally(() => setIsLoading(false));
+    }, [isAuthenticated, page]);
 
-    const getStatusStyle = (status: string) => {
-        switch (status) {
-            case "DELIVERED": return "bg-[#E9F8E5] text-[#3F6136]";
-            case "IN TRANSIT": return "bg-amber-50 text-amber-700";
-            case "CANCELLED": return "bg-stone-100 text-stone-500";
-            default: return "bg-stone-100 text-stone-700";
-        }
-    };
+    if (authLoading || isLoading) {
+        return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-[#5CE614]" /></div>;
+    }
 
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case "DELIVERED": return <div className="w-10 h-10 rounded-full bg-[#E9F8E5] flex items-center justify-center text-[#5CE614]"><CheckCircle2 className="w-5 h-5" /></div>;
-            case "IN TRANSIT": return <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-500"><Truck className="w-5 h-5" /></div>;
-            case "CANCELLED": return <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-400"><XCircle className="w-5 h-5" /></div>;
-            default: return null;
-        }
-    };
+    if (!isAuthenticated) {
+        return (
+            <div className="text-center py-20">
+                <Package className="w-14 h-14 mx-auto text-stone-200 mb-4" />
+                <h2 className="text-[22px] font-bold text-[#111] mb-2">Sign in to view your orders</h2>
+            </div>
+        );
+    }
+
+    if (orders.length === 0) {
+        return (
+            <div className="text-center py-20">
+                <Package className="w-14 h-14 mx-auto text-stone-200 mb-4" />
+                <h2 className="text-[22px] font-bold text-[#111] mb-2">No orders yet</h2>
+                <p className="text-stone-400 text-sm mb-6">Your order history will appear here after you make a purchase.</p>
+                <Link href="/shop" className="inline-block bg-[#5CE614] hover:bg-[#4BD600] text-black font-bold px-8 py-3 rounded-full text-[14px] transition-colors">
+                    Start Shopping
+                </Link>
+            </div>
+        );
+    }
 
     return (
-        <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 border-b border-stone-100 pb-8">
-                <div>
-                    <h1 className="text-[28px] font-bold text-[#111] tracking-tight mb-2">Order History</h1>
-                    <p className="text-stone-500 text-[15px]">You have made 12 purchases since joining in 2022.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 px-5 h-10 rounded-full border border-stone-200 text-sm font-semibold text-[#111] hover:bg-stone-50 transition-colors bg-white">
-                        <Filter className="w-4 h-4" /> Filter
-                    </button>
-                    <button className="flex items-center gap-2 px-5 h-10 rounded-full border border-stone-200 text-sm font-semibold text-[#111] hover:bg-stone-50 transition-colors bg-white shadow-sm">
-                        <Download className="w-4 h-4" /> Export Invoices
-                    </button>
-                </div>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <h1 className="text-[22px] font-bold text-[#111]">Order History <span className="text-stone-400 font-normal text-[16px]">({total})</span></h1>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
                 {orders.map((order) => (
-                    <div key={order.id} className="border border-stone-200 rounded-3xl p-6 bg-white shadow-sm">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                            <div className="flex items-center gap-4">
-                                {getStatusIcon(order.status)}
-                                <div>
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <h3 className="text-[17px] font-bold text-[#111]">Order {order.id}</h3>
-                                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded border-0 ${getStatusStyle(order.status)}`}>
-                                            {order.status}
+                    <div key={order._id} className="bg-[#FAFAFA] rounded-2xl border border-stone-100 p-5 hover:shadow-sm transition-all">
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="font-bold text-[15px] text-[#111]">{order.orderNumber}</span>
+                                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATUS_STYLES[order.status] ?? ""}`}>
+                                        {order.status}
+                                    </span>
+                                </div>
+                                <p className="text-[13px] text-stone-400 mb-3">
+                                    {new Date(order.createdAt).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })}
+                                    {" · "}{order.items.length} item{order.items.length !== 1 ? "s" : ""}
+                                </p>
+                                <div className="flex gap-2 flex-wrap">
+                                    {order.items.slice(0, 3).map((item, i) => (
+                                        <span key={i} className="text-[12px] text-stone-500 bg-white border border-stone-100 px-2.5 py-1 rounded-lg">
+                                            {item.title} ×{item.quantity}
                                         </span>
-                                    </div>
-                                    <p className="text-stone-500 text-[13px]">
-                                        Placed on {order.date} <span className="mx-1.5 text-stone-300">•</span>
-                                        {order.isRefunded ? "Refunded" : `Total $${order.total.toFixed(2)}`}
-                                    </p>
+                                    ))}
+                                    {order.items.length > 3 && (
+                                        <span className="text-[12px] text-stone-400 px-2.5 py-1">+{order.items.length - 3} more</span>
+                                    )}
                                 </div>
                             </div>
-
-                            {order.status === "DELIVERED" && (
-                                <button className="h-10 px-6 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] text-[13px] font-bold transition-colors shadow-sm">
-                                    Reorder
-                                </button>
-                            )}
-                            {order.status === "IN TRANSIT" && (
-                                <button className="h-10 px-6 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] text-[13px] font-bold transition-colors shadow-sm">
-                                    Track Order
-                                </button>
-                            )}
+                            <div className="text-right flex-shrink-0">
+                                <p className="font-bold text-[18px] text-[#111]">{formatCurrency(order.total)}</p>
+                                <p className="text-[11px] text-stone-400 font-semibold uppercase tracking-widest mt-1">
+                                    {order.paymentStatus}
+                                </p>
+                            </div>
                         </div>
-
-                        {order.status === "IN TRANSIT" && (
-                            <div className="mb-6 px-14 sm:px-[72px]">
-                                <div className="h-1.5 w-full bg-stone-100 rounded-full relative mb-2">
-                                    <div className="absolute top-0 left-0 h-full w-[65%] bg-[#5CE614] rounded-full"></div>
-                                </div>
-                                <div className="flex justify-between text-[10px] font-bold text-stone-400 tracking-widest uppercase">
-                                    <span className="text-stone-400">Confirmed</span>
-                                    <span className="text-[#5CE614]">In Transit</span>
-                                    <span className="text-stone-400">Delivered</span>
-                                </div>
+                        {order.trackingNumber && (
+                            <div className="mt-3 pt-3 border-t border-stone-100 text-[12px] text-stone-500">
+                                📦 Tracking: <span className="font-bold text-[#111]">{order.trackingNumber}</span>
                             </div>
                         )}
-
-                        <div className="flex items-center justify-between border-t border-stone-100 pt-6 mt-4">
-                            <div className="flex items-center gap-[-8px]">
-                                {order.items.length > 0 ? (
-                                    <div className="flex -space-x-3">
-                                        {order.items.map((item, idx) => (
-                                            item.isCount ? (
-                                                <div key={idx} className="w-10 h-10 rounded-xl bg-stone-200 border-2 border-white flex items-center justify-center text-[11px] font-bold text-stone-600 z-20">
-                                                    {item.count}
-                                                </div>
-                                            ) : (
-                                                <div key={idx} className={`w-10 h-10 rounded-xl border-2 border-white flex items-center justify-center overflow-hidden z-${10 - idx} relative ${item.imageClass}`}>
-                                                    {item.hasFlowers && (
-                                                        <div className="absolute inset-0 bg-stone-900/10 mix-blend-multiply" />
-                                                    )}
-                                                    {item.hasVase && (
-                                                        <div className="w-3 h-6 rounded-full bg-[#C7A382] rotate-12" />
-                                                    )}
-                                                </div>
-                                            )
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="h-10"></div>
-                                )}
-                            </div>
-
-                            <button className="text-[13px] font-bold text-stone-500 hover:text-[#5CE614] flex items-center transition-colors">
-                                {order.status === "CANCELLED" ? "View Details" : "View Order Details"}
-                                <ChevronRight className="w-4 h-4 ml-1" />
-                            </button>
-                        </div>
                     </div>
                 ))}
             </div>
 
-            <div className="flex justify-center items-center gap-2 pt-8">
-                <button className="w-10 h-10 rounded-full border border-stone-200 flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-colors">
-                    <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button className="w-10 h-10 rounded-full bg-[#5CE614] text-[#111] font-bold text-sm shadow-sm flex items-center justify-center">
-                    1
-                </button>
-                <button className="w-10 h-10 rounded-full bg-white border border-stone-200 text-stone-600 font-semibold text-sm hover:bg-stone-50 transition-colors flex items-center justify-center">
-                    2
-                </button>
-                <button className="w-10 h-10 rounded-full bg-white border border-stone-200 text-stone-600 font-semibold text-sm hover:bg-stone-50 transition-colors flex items-center justify-center">
-                    3
-                </button>
-                <button className="w-10 h-10 rounded-full border border-stone-200 flex items-center justify-center text-stone-400 hover:bg-stone-50 transition-colors">
-                    <ChevronRight className="w-5 h-5" />
-                </button>
-            </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex justify-center gap-2 pt-4">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                            key={p} onClick={() => setPage(p)}
+                            className={`w-9 h-9 rounded-xl text-[13px] font-bold transition-colors ${p === page ? "bg-[#5CE614] text-black" : "bg-stone-100 text-stone-500 hover:bg-stone-200"}`}
+                        >
+                            {p}
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

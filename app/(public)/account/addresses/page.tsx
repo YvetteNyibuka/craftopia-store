@@ -1,155 +1,168 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, Plus, Pencil, Trash2, Home, Building2, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MapPin, Plus, Trash2, Star, Loader2, X } from "lucide-react";
+import { addressesApi, ApiAddress } from "@/lib/api/orders";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ApiError } from "@/lib/api/client";
 
-const initialAddresses = [
-    {
-        id: "a1",
-        label: "Home",
-        icon: Home,
-        name: "Sarah Jenkins",
-        line1: "14 Bluebell Lane",
-        line2: "Maadi, Cairo",
-        city: "Cairo",
-        country: "Egypt",
-        postcode: "11743",
-        phone: "+20 100 000 0000",
-        isDefault: true,
-    },
-    {
-        id: "a2",
-        label: "Office",
-        icon: Building2,
-        name: "Sarah Jenkins",
-        line1: "Suite 4B, Garden City Tower",
-        line2: "Garden City, Cairo",
-        city: "Cairo",
-        country: "Egypt",
-        postcode: "11561",
-        phone: "+20 110 000 0000",
-        isDefault: false,
-    },
-];
+const EMPTY_FORM: Omit<ApiAddress, "_id"> = {
+    label: "Home", name: "", line1: "", line2: "", city: "", postcode: "", country: "Egypt", phone: "", isDefault: false,
+};
 
 export default function AddressesPage() {
-    const [addresses, setAddresses] = useState(initialAddresses);
+    const { isAuthenticated } = useAuth();
+    const [addresses, setAddresses] = useState<ApiAddress[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState<Omit<ApiAddress, "_id">>(EMPTY_FORM);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState("");
 
-    const remove = (id: string) => setAddresses((a) => a.filter((addr) => addr.id !== id));
-    const setDefault = (id: string) =>
-        setAddresses((a) => a.map((addr) => ({ ...addr, isDefault: addr.id === id })));
+    useEffect(() => {
+        if (!isAuthenticated) { setIsLoading(false); return; }
+        addressesApi.list().then((r) => setAddresses(r.data)).finally(() => setIsLoading(false));
+    }, [isAuthenticated]);
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        if (!form.name || !form.line1 || !form.city || !form.postcode || !form.country) {
+            setError("Please fill in all required fields."); return;
+        }
+        setIsSaving(true);
+        try {
+            const res = await addressesApi.add(form);
+            setAddresses(res.data);
+            setShowForm(false);
+            setForm(EMPTY_FORM);
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to save address.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSetDefault = async (id: string) => {
+        const res = await addressesApi.setDefault(id);
+        setAddresses(res.data);
+    };
+
+    const handleDelete = async (id: string) => {
+        const res = await addressesApi.delete(id);
+        setAddresses(res.data);
+    };
+
+    if (isLoading) return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-[#5CE614]" /></div>;
 
     return (
-        <div className="space-y-8">
-            {/* Header */}
+        <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-[28px] font-bold text-[#111] tracking-tight mb-1">Addresses</h1>
-                    <p className="text-stone-400 text-[14px]">Manage your delivery addresses.</p>
-                </div>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="flex items-center gap-2 px-5 h-10 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-[13px] transition-colors shadow-sm"
-                >
-                    <Plus className="w-4 h-4" /> Add Address
-                </button>
+                <h1 className="text-[22px] font-bold text-[#111]">Delivery Addresses</h1>
+                {!showForm && (
+                    <Button onClick={() => setShowForm(true)} className="bg-[#5CE614] hover:bg-[#4BD600] text-black font-bold rounded-xl h-10 px-5 shadow-none">
+                        <Plus className="w-4 h-4 mr-1.5" /> Add Address
+                    </Button>
+                )}
             </div>
 
-            {/* Add form */}
+            {/* Add address form */}
             {showForm && (
-                <div className="bg-[#F7F9F7] rounded-2xl p-7 border border-[#d4edc9]">
-                    <h2 className="text-[15px] font-bold text-[#111] mb-5">New Address</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {[
-                            { label: "Full Name", placeholder: "Sarah Jenkins" },
-                            { label: "Phone", placeholder: "+20 100 000 000" },
-                            { label: "Address Line 1", placeholder: "Street address", span: true },
-                            { label: "Address Line 2 (optional)", placeholder: "Apt, suite, etc.", span: true },
-                            { label: "City", placeholder: "Cairo" },
-                            { label: "Postcode", placeholder: "11743" },
-                            { label: "Country", placeholder: "Egypt" },
-                        ].map((f) => (
-                            <div key={f.label} className={f.span ? "sm:col-span-2" : ""}>
-                                <label className="block text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">{f.label}</label>
-                                <input
-                                    placeholder={f.placeholder}
-                                    className="w-full h-11 px-4 bg-white rounded-xl border border-stone-200 text-[14px] text-[#111] outline-none focus:ring-2 focus:ring-[#5CE614] transition-shadow placeholder:text-stone-300"
-                                />
+                <div className="bg-[#FAFAFA] rounded-2xl border border-stone-200 p-6">
+                    <div className="flex items-center justify-between mb-5">
+                        <h2 className="font-bold text-[16px] text-[#111]">New Address</h2>
+                        <button onClick={() => { setShowForm(false); setError(""); setForm(EMPTY_FORM); }}
+                            className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition-colors">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    {error && <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>}
+                    <form onSubmit={handleAdd} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Label</label>
+                                <Input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="Home / Work" className="h-11 rounded-xl" />
                             </div>
-                        ))}
-                    </div>
-                    <div className="flex gap-3 mt-5">
-                        <button className="px-6 h-10 rounded-full bg-[#5CE614] hover:bg-[#4BD600] text-[#111] font-bold text-[13px] transition-colors">
-                            Save Address
-                        </button>
-                        <button onClick={() => setShowForm(false)} className="px-6 h-10 rounded-full border border-stone-200 text-stone-600 font-semibold text-[13px] hover:bg-stone-50 transition-colors">
-                            Cancel
-                        </button>
-                    </div>
+                            <div>
+                                <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Full Name *</label>
+                                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Jane Doe" className="h-11 rounded-xl" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Street Address *</label>
+                            <Input value={form.line1} onChange={(e) => setForm((f) => ({ ...f, line1: e.target.value }))} placeholder="123 Blossom Lane" className="h-11 rounded-xl" />
+                        </div>
+                        <div>
+                            <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Apt / Suite (optional)</label>
+                            <Input value={form.line2} onChange={(e) => setForm((f) => ({ ...f, line2: e.target.value }))} placeholder="Apt 4B" className="h-11 rounded-xl" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-[13px] font-semibold text-[#111] mb-1.5">City *</label>
+                                <Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} placeholder="Cairo" className="h-11 rounded-xl" />
+                            </div>
+                            <div>
+                                <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Postcode *</label>
+                                <Input value={form.postcode} onChange={(e) => setForm((f) => ({ ...f, postcode: e.target.value }))} placeholder="11743" className="h-11 rounded-xl" />
+                            </div>
+                            <div>
+                                <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Country *</label>
+                                <Input value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} placeholder="Egypt" className="h-11 rounded-xl" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-[13px] font-semibold text-[#111] mb-1.5">Phone (optional)</label>
+                            <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+20 100 000 0000" className="h-11 rounded-xl" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input type="checkbox" id="isDefault" checked={form.isDefault}
+                                onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))}
+                                className="w-4 h-4 accent-[#5CE614] rounded" />
+                            <label htmlFor="isDefault" className="text-[13px] font-semibold text-[#111]">Set as default address</label>
+                        </div>
+                        <Button type="submit" disabled={isSaving} className="w-full h-11 bg-[#5CE614] hover:bg-[#4BD600] text-black font-bold rounded-xl shadow-none">
+                            {isSaving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Saving…</> : "Save Address"}
+                        </Button>
+                    </form>
                 </div>
             )}
 
-            {/* Address Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {addresses.map((addr) => (
-                    <div
-                        key={addr.id}
-                        className={`relative rounded-2xl p-6 border transition-all ${addr.isDefault
-                                ? "border-[#5CE614] bg-[#F7FBF4] shadow-sm"
-                                : "border-stone-200 bg-white hover:border-stone-300"
-                            }`}
-                    >
-                        {addr.isDefault && (
-                            <div className="absolute top-4 right-4 flex items-center gap-1 text-[#3F6136] text-[11px] font-bold">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-[#5CE614]" /> Default
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 bg-[#E9F4E5] rounded-full flex items-center justify-center text-[#3F6136]">
-                                <addr.icon className="w-4 h-4" />
-                            </div>
-                            <span className="text-[14px] font-bold text-[#111]">{addr.label}</span>
-                        </div>
-
-                        <p className="text-[14px] font-semibold text-[#111] mb-0.5">{addr.name}</p>
-                        <p className="text-[13px] text-stone-500">{addr.line1}</p>
-                        <p className="text-[13px] text-stone-500">{addr.line2}</p>
-                        <p className="text-[13px] text-stone-500">{addr.city}, {addr.postcode}</p>
-                        <p className="text-[13px] text-stone-500">{addr.country}</p>
-                        <p className="text-[13px] text-stone-400 mt-1">{addr.phone}</p>
-
-                        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-stone-100">
-                            <button className="flex items-center gap-1.5 text-[12px] font-bold text-stone-500 hover:text-[#111] transition-colors">
-                                <Pencil className="w-3.5 h-3.5" /> Edit
-                            </button>
-                            <button
-                                onClick={() => remove(addr.id)}
-                                className="flex items-center gap-1.5 text-[12px] font-bold text-red-400 hover:text-red-600 transition-colors"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" /> Remove
-                            </button>
-                            {!addr.isDefault && (
-                                <button
-                                    onClick={() => setDefault(addr.id)}
-                                    className="ml-auto text-[12px] font-bold text-[#5CE614] hover:text-[#4BD600] transition-colors"
-                                >
-                                    Set as default
-                                </button>
+            {/* Address cards */}
+            {addresses.length === 0 && !showForm ? (
+                <div className="text-center py-16">
+                    <MapPin className="w-12 h-12 mx-auto text-stone-200 mb-3" />
+                    <p className="text-stone-400 text-[14px]">No addresses saved yet. Add one to speed up checkout.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {addresses.map((addr) => (
+                        <div key={addr._id} className={`relative rounded-2xl border p-5 transition-all ${addr.isDefault ? "border-[#5CE614] bg-[#F6FBF4]" : "border-stone-100 bg-[#FAFAFA]"}`}>
+                            {addr.isDefault && (
+                                <span className="absolute top-3 right-3 text-[10px] font-bold bg-[#5CE614]/20 text-[#3F6136] px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <Star className="w-2.5 h-2.5 fill-current" /> Default
+                                </span>
                             )}
+                            <p className="text-[11px] font-bold text-stone-400 uppercase tracking-widest mb-2">{addr.label}</p>
+                            <p className="font-bold text-[15px] text-[#111]">{addr.name}</p>
+                            <p className="text-[13px] text-stone-500 mt-1">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}</p>
+                            <p className="text-[13px] text-stone-500">{addr.city}, {addr.postcode}, {addr.country}</p>
+                            {addr.phone && <p className="text-[13px] text-stone-500 mt-0.5">{addr.phone}</p>}
+                            <div className="flex gap-3 mt-4">
+                                {!addr.isDefault && (
+                                    <button onClick={() => handleSetDefault(addr._id!)}
+                                        className="text-[12px] font-bold text-stone-500 hover:text-[#3F6136] transition-colors">
+                                        Set Default
+                                    </button>
+                                )}
+                                <button onClick={() => handleDelete(addr._id!)}
+                                    className="text-[12px] font-bold text-stone-400 hover:text-red-500 transition-colors flex items-center gap-1 ml-auto">
+                                    <Trash2 className="w-3.5 h-3.5" /> Remove
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
-
-            {addresses.length === 0 && (
-                <div className="flex flex-col items-center py-20 text-center">
-                    <div className="w-14 h-14 bg-stone-100 rounded-full flex items-center justify-center mb-4">
-                        <MapPin className="w-6 h-6 text-stone-400" />
-                    </div>
-                    <p className="text-[15px] font-bold text-[#111] mb-1">No addresses saved</p>
-                    <p className="text-stone-400 text-[13px]">Add an address to speed up checkout.</p>
+                    ))}
                 </div>
             )}
         </div>
